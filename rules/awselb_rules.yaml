@@ -1,0 +1,40 @@
+- required_engine_version: 10
+
+- required_plugin_versions:
+  - name: awselb
+    version: 0.1.0
+
+- rule: All AWS ELB Events
+  desc: Match all aws alb events.
+  condition:
+    evt.num > 0
+  output: Some AWS ELB Event (evtnum=%evt.num info=%evt.plugininfo ts=%evt.time.iso8601 elb_name=%awselb.name elb_status_code=%awselb.elb_status_code)
+  priority: DEBUG
+  tags:
+    - cloud
+    - aws
+  source: awselb
+  enabled: false
+- rule: ELB Slow Response Time
+  desc: Detect slow response times from ELB targets
+  condition: awselb.target_processing_time > 5.0
+  output: Slow response time detected from ELB target (elb=%awselb.name target_ip=%awselb.target_ip response_time=%awselb.target_processing_time)
+  priority: INFO
+  tags:
+    - cloud
+    - aws
+    - aws_elb
+  source: awselb
+- rule: ELB Suspicious User Agent
+  desc: Detect suspicious user agents accessing ELB
+  condition:
+    awselb.user_agent contains "sqlmap" or awselb.user_agent contains "nmap" or awselb.user_agent contains "nikto"
+  output:
+    Suspicious user agent detected in ELB access logs
+    (elb=%awselb.name client_ip=%awselb.client_ip user_agent=%awselb.user_agent)
+  priority: WARNING
+  tags:
+    - cloud
+    - aws
+    - aws_elb
+  source: awselb
