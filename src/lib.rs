@@ -65,7 +65,11 @@ impl Plugin for AwsElbPlugin {
                 .load()
                 .await;
 
-            let s3_client = S3Client::new(&config);
+            let s3_config = aws_sdk_s3::config::Builder::from(&config)
+                .force_path_style(true)
+                .build();
+
+            let s3_client = aws_sdk_s3::Client::from_conf(s3_config);
 
             Arc::new(s3_client)
         });
