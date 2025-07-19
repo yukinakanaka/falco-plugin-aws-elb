@@ -123,3 +123,6 @@ The plugin requires the following IAM permissions:
     ]
 }
 ```
+
+## Contributing
+Want to contribute? Great! Check out our [Contributing Guide](./CONTRIBUTING.md) to get started.
