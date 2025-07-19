@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  localstack:
+    container_name: "localstack"
+    image: localstack/localstack:s3-latest
+    ports:
+      - "127.0.0.1:4566:4566"
+    volumes:
+      - "./init-s3.py:/etc/localstack/init/ready.d/init-s3.py"
