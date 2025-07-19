@@ -1,0 +1,17 @@
+- required_engine_version: 10
+
+- required_plugin_versions:
+  - name: awselb
+    version: 0.1.0
+
+- rule: All AWS ELB Events
+  desc: Match all aws alb events.
+  condition:
+    evt.num > 0
+  output: Some AWS ELB Event (evtnum=%evt.num info=%evt.plugininfo ts=%evt.time.iso8601 elb_name=%awselb.name elb_status_code=%awselb.elb_status_code)
+  priority: DEBUG
+  tags:
+    - cloud
+    - aws
+  source: awselb
+  enabled: true
