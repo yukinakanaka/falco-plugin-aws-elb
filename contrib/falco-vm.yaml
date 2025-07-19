@@ -1,0 +1,102 @@
+# Change cpu/memory if required
+cpus: 8
+memory: "16GiB"
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+# macOS Virtualization.Framework(vz) is faster than QUEM: https://lima-vm.io/docs/config/vmtype/
+vmType: "vz"
+mountType: "virtiofs"
+
+mounts:
+  - location: "~"
+    writable: true
+  - location: "/tmp/lima"
+    writable: true
+
+# containerd is managed by Docker, not by Lima, so the values are set to false here.
+containerd:
+  system: false
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      apt update
+      apt install -y apt-transport-https ca-certificates curl clang llvm jq
+      apt install -y linux-tools-common linux-tools-$(uname -r)
+      apt install -y libelf-dev libcap-dev libpcap-dev libbfd-dev binutils-dev build-essential make
+      apt install -y python3-pip unzip
+      sysctl -w kernel.bpf_stats_enabled=1
+
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      command -v docker >/dev/null 2>&1 && exit 0
+      export DEBIAN_FRONTEND=noninteractive
+      curl -fsSL https://get.docker.com | sh
+
+  - mode: user
+    script: |
+      #!/bin/bash
+      sudo usermod -aG docker $USER
+      newgrp docker
+
+  - mode: system
+    script: |
+      #!/bin/bash
+      # Install falco
+      curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | \
+        gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
+      
+      echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | \
+        tee -a /etc/apt/sources.list.d/falcosecurity.list
+
+      apt update -y
+      sudo apt install -y dkms make linux-headers-$(uname -r)
+      sudo apt install -y dialog
+      
+      FALCO_FRONTEND=noninteractive FALCO_DRIVER_CHOICE=modern_ebpf apt-get install -y falco
+
+  - mode: user
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+  - mode: user
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      tmpdir=$(mktemp -d)
+      cd "$tmpdir"
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+      unzip awscliv2.zip
+      sudo ./aws/install
+
+probes:
+  - description: "docker to be installed"
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      if ! timeout 30s bash -c "until command -v docker >/dev/null 2>&1; do sleep 3; done"; then
+        echo >&2 "docker is not installed yet"
+        exit 1
+      fi
+    hint: See "/var/log/cloud-init-output.log". in the guest
+
+  - description: "falco to be installed"
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      if ! timeout 30s bash -c "until command -v falco >/dev/null 2>&1; do sleep 3; done"; then
+        echo >&2 "falco is not installed yet"
+        exit 1
+      fi
+    hint: See "/var/log/cloud-init-output.log". in the guest
